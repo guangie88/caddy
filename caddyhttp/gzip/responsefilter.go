@@ -25,8 +25,32 @@ type ResponseFilter interface {
 	ShouldCompress(http.ResponseWriter) bool
 }
 
+// ContentTypeFilter is ResponseFilter for whitelisting content type to apply
+// compression.
+type ContentTypeFilter struct {
+	Types Set
+}
+
+// ContentTypeWildCard is the wildcard for content type.
+const ContentTypeWildCard = "*"
+
+// DefaultContentTypeFilter creates an ContentTypeFilter that accepts all content types.
+func DefaultContentTypeFilter() ContentTypeFilter {
+	c := ContentTypeFilter{Types: make(Set)}
+	c.Types.Add(ContentTypeWildCard)
+	return c
+}
+
 // LengthFilter is ResponseFilter for minimum content length.
 type LengthFilter int64
+
+// ShouldCompress checks if the response header content type matches any of the
+// registered content type. It returns true if the content type is found and
+// false otherwise.
+func (c ContentTypeFilter) ShouldCompress(w http.ResponseWriter) bool {
+	contentType := w.Header().Get("Content-Type")
+	return c.Types.Contains(ContentTypeWildCard) || c.Types.Contains(contentType)
+}
 
 // ShouldCompress returns if content length is greater than or
 // equals to minimum length.

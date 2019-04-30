@@ -52,6 +52,7 @@ func gzipParse(c *caddy.Controller) ([]Config, error) {
 
 		// Response Filters
 		lengthFilter := LengthFilter(0)
+		contentTypeFilter := ContentTypeFilter{Types: make(Set)}
 
 		// No extra args expected
 		if len(c.RemainingArgs()) > 0 {
@@ -102,6 +103,17 @@ func gzipParse(c *caddy.Controller) ([]Config, error) {
 					return configs, fmt.Errorf(`gzip: min_length must be greater than 0`)
 				}
 				lengthFilter = LengthFilter(length)
+			case "content_type":
+				types := c.RemainingArgs()
+				if len(types) == 0 {
+					return configs, c.ArgErr()
+				}
+				for _, t := range types {
+					if len(strings.Split(t, "/")) != 2 && t != ContentTypeWildCard {
+						return configs, fmt.Errorf(`gzip: invalid content type "%v" (must be of form type/subtype)`, t)
+					}
+					contentTypeFilter.Types.Add(t)
+				}
 			default:
 				return configs, c.ArgErr()
 			}
@@ -129,6 +141,14 @@ func gzipParse(c *caddy.Controller) ([]Config, error) {
 		// If min_length is specified, use it.
 		if int64(lengthFilter) != 0 {
 			config.ResponseFilters = append(config.ResponseFilters, lengthFilter)
+		}
+
+		// Then, if content types are specified, use those to filter.
+		// Otherwise, use default content types filter.
+		if len(contentTypeFilter.Types) > 0 {
+			config.ResponseFilters = append(config.ResponseFilters, contentTypeFilter)
+		} else {
+			config.ResponseFilters = append(config.ResponseFilters, DefaultContentTypeFilter())
 		}
 
 		configs = append(configs, config)
